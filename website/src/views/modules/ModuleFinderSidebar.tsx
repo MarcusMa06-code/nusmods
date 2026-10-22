@@ -21,7 +21,8 @@ import RandomPicker from 'views/components/searchkit/RandomPicker';
 
 import { getSemesterTimetableLessons } from 'selectors/timetables';
 import { getSemesterModules } from 'utils/timetables';
-import { getModuleSemesterData } from 'utils/modules';
+import { getExamTiming, type ExamTiming } from 'utils/timetables/exams';
+import { buildNoExamClashFilter } from 'utils/timetables/examClashFilter';
 import { notNull } from 'types/utils';
 
 import config from 'config';
@@ -53,24 +54,14 @@ const STATIC_EXAM_FILTER_ITEMS: FilterItem[] = [
   },
 ];
 
-function getExamClashFilter(semester: Semester, examDates: string[]): FilterItem {
+function getExamClashFilter(semester: Semester, examTimings: ExamTiming[]): FilterItem | null {
+  const filter = buildNoExamClashFilter(examTimings);
+  if (!filter) return null;
+
   return {
     key: `no-exam-clash-${semester}`,
     label: `No Exam Clash (${config.shortSemesterNames[semester]})`,
-    filter: {
-      bool: {
-        must_not: {
-          nested: {
-            path: 'semesterData',
-            query: {
-              terms: {
-                'semesterData.examDate': examDates,
-              },
-            },
-          },
-        },
-      },
-    },
+    filter,
   };
 }
 
@@ -86,10 +77,8 @@ const ModuleFinderSidebar: React.FC = () => {
     const examClashFilters = Semesters.map((semester): FilterItem | null => {
       const timetable = getSemesterTimetable(semester);
       const modules = getSemesterModules(timetable, allModules);
-      const examDates = modules
-        .map((module) => getModuleSemesterData(module, semester)?.examDate)
-        .filter(notNull);
-      return examDates.length ? getExamClashFilter(semester, examDates) : null;
+      const examTimings = modules.map((module) => getExamTiming(module, semester)).filter(notNull);
+      return getExamClashFilter(semester, examTimings);
     }).filter(notNull);
     return [...STATIC_EXAM_FILTER_ITEMS, ...examClashFilters];
   }, [getSemesterTimetable, allModules]);
