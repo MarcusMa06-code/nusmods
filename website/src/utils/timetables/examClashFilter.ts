@@ -36,10 +36,7 @@ type OverlapClause = {
   };
 };
 
-function overlapClause(timing: ExamTiming): OverlapClause | null {
-  const bounds = examTimingBounds(timing);
-  if (!bounds) return null;
-
+function overlapClause(bounds: { startMs: number; endMs: number }): OverlapClause {
   return {
     bool: {
       must: [
@@ -73,13 +70,10 @@ export function buildNoExamClashFilter(timings: ExamTiming[]) {
   for (const timing of timings) {
     const bounds = examTimingBounds(timing);
     if (!bounds) continue;
-    const examEnd = new Date(bounds.endMs).toISOString();
-    const key = `${bounds.startMs}:${examEnd}`;
+    const key = `${bounds.startMs}:${bounds.endMs}`;
     if (seen.has(key)) continue;
-    const clause = overlapClause(timing);
-    if (!clause) continue;
     seen.add(key);
-    clauses.push(clause);
+    clauses.push(overlapClause(bounds));
   }
 
   if (clauses.length === 0) return null;
